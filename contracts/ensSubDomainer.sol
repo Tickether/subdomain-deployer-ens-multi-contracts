@@ -88,26 +88,34 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     IENS ens = IENS(0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e);
     INameWrapper nameWrapper = INameWrapper(0x114D4603199df73e7D157787f8778E21fCd13066);
     IBaseRegistrarImplementation baseRegistrarImplementation = IBaseRegistrarImplementation(0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85);
+    address public ensResolver = 0xd7a4F6473f32aC2Af804B3686AE8F1932bC35750;
+    //bytes32 public parentNode;
+    // will be removed so it can be maunually added per the user
     
-    bytes32 public parentNode;
-    address public ensResolver;
 
-    uint256 public threeUpLetterFee;
-    uint256 public fourFiveLetterFee;
-    uint256 public sixDownLetterFee;
+    //uint256 public threeUpLetterFee;
+    //uint256 public fourFiveLetterFee;
+    //uint256 public sixDownLetterFee;
 
     //track eth balances mapping per node
+    mapping(bytes32 => uint256) public parentNodeBalance;
+    //track intt nodes
+    mapping(bytes32 => bool) public parentNodeActive;
     //track prices mapping per node
-    //payout wallets per node
+    mapping(bytes32 => uint256) public threeUpLetterFee;
+    mapping(bytes32 => uint256) public fourFiveLetterFee;
+    mapping(bytes32 => uint256) public sixDownLetterFee;
+    
 
 
     // set base fee
-    function setLetterFees(uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
+    function setLetterFees(bytes32 node, uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
         external 
+        isNodeActiveOwnerorApproved(node)
     {
-        threeUpLetterFee = threeUpLetterFee_;
-        fourFiveLetterFee = fourFiveLetterFee_;
-        sixDownLetterFee = sixDownLetterFee_;
+        threeUpLetterFee[node] = threeUpLetterFee_;
+        fourFiveLetterFee[node] = fourFiveLetterFee_;
+        sixDownLetterFee[node] = sixDownLetterFee_;
         
     }
 
@@ -133,7 +141,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
 
     
     //gets price base on string length
-    function getLetterFees(string memory label, uint256 duration)  
+    function getLetterFees(bytes32 node, string memory label, uint256 duration)  
         public
         view
         returns (uint256) 
@@ -143,11 +151,11 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
 
         uint256 price;
         if (len <= 3) {
-            price = uint256(getLatestPrice(threeUpLetterFee)) * duration;
+            price = uint256(getLatestPrice(threeUpLetterFee[node])) * duration;
         } else if (len <= 5) {
-            price = uint256(getLatestPrice(fourFiveLetterFee)) * duration;
+            price = uint256(getLatestPrice(fourFiveLetterFee[node])) * duration;
         } else if (len >= 6) {
-            price = uint256(getLatestPrice(sixDownLetterFee)) * duration;    
+            price = uint256(getLatestPrice(sixDownLetterFee[node])) * duration;    
         }
         return price;
     }
@@ -159,14 +167,14 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         _;
     }
 
-    modifier isAvailableLabel (string memory subNodeLabel_) {
+    modifier isAvailableLabel (bytes32 node, string memory subNodeLabel_) {
         bytes32 labelhash = keccak256(bytes(subNodeLabel_));
-        require(!ens.recordExists(keccak256(abi.encodePacked(parentNode, labelhash))), "not Available Label");
+        require(!ens.recordExists(keccak256(abi.encodePacked(node, labelhash))), "not Available Label");
         _;
     }
 
     modifier isNodeActiveOwnerorApproved (bytes32 node) {
-        (address owner, uint32 fuses, uint64 expiry) = nameWrapper.getData(uint256(node));
+        (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         if(nameWrapper.isWrapped(node)) {
             require(msg.sender == owner || nameWrapper.isApprovedForAll(owner, msg.sender), "not the owner of node");
         } else {
@@ -175,51 +183,55 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         _;
     }
 
-//function to set initial domain and node
-
+//function to set init node
     function setBaseEns(bytes32 node)
         onlyOwner  
         isNodeActiveOwnerorApproved(node)
         external 
     {
-        parentNode = node;
-        ensResolver = ens.resolver(parentNode);
+        (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
+        require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
+        parentNodeActive[node] = true;
     }
 
 
 
     
-    function getParentExpiry()  
+    function getParentExpiry(bytes32 node)  
         internal
         view
         returns (uint256) 
     {
-        string memory label = StringUtils.extractLabel(nameWrapper.names(parentNode));
+        string memory label = StringUtils.extractLabel(nameWrapper.names(node));
         uint256 tokenId = uint256(keccak256(bytes(label)));
         return baseRegistrarImplementation.nameExpires(tokenId);
     }
 
 // function to set new sub domain
 
-    function setSubDomain(string memory subNodeLabel, address owner, uint256 duration)  
+    function setSubDomain(bytes32 node, string memory subNodeLabel, address owner, uint256 duration)  
         external 
         payable 
         isApprovedLabel(subNodeLabel)
-        isAvailableLabel(subNodeLabel)
+        isAvailableLabel(node, subNodeLabel)
+        nonReentrant
     {
         uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
         uint64 timestamp = uint64(block.timestamp);
-        uint256 parentNodeYrsLeft = getParentExpiry() - timestamp;
+        uint256 parentNodeYrsLeft = getParentExpiry(node) - timestamp;
         uint64 maxYears = uint64(parentNodeYrsLeft) / uint64(31556926);
-        uint256 price = getLetterFees(subNodeLabel, duration);
+        uint256 price = getLetterFees(node, subNodeLabel, duration);
 
         require(duration <= maxYears,'cant extend date past the parent');
-        require(nameWrapper.isWrapped(parentNode), 'parent must be wrapped');
-        require(nameWrapper.allFusesBurned(parentNode, 1), 'parent must be locked');
+        require(nameWrapper.isWrapped(node), 'parent must be wrapped');
+        require(nameWrapper.allFusesBurned(node, 1), 'parent must be locked');
         require(price == msg.value, 'price not correct');
 
+        // do balance mapping record
+        parentNodeBalance[node] += msg.value;
+        
         uint64 subscriptionPeriod = uint64(duration) * 31556926;
-        nameWrapper.setSubnodeRecord(parentNode, subNodeLabel, owner, ensResolver, 0, fuses, subscriptionPeriod + timestamp);
+        nameWrapper.setSubnodeRecord(node, subNodeLabel, owner, ensResolver, 0, fuses, subscriptionPeriod + timestamp);
 
     }
 
@@ -227,38 +239,48 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
 // the real issue here is we cannot emancipate or risk losing out on yearly subdomain subs model
 // we have to lock instead
 // solved
-    function extendSubDomain(bytes32 subNode,  uint256 duration)
+    function extendSubDomain(bytes32 node, bytes32 subNode,  uint256 duration)
         external 
         payable  
         isNodeActiveOwnerorApproved(subNode) 
+        nonReentrant
     {
         string memory label = StringUtils.extractLabel(nameWrapper.names(subNode));
         bytes32 labelhash = keccak256(bytes(label));
         uint256 tokenId = uint256(subNode);
 
         (/* address owner */, /*uint32 fuses*/, uint64 expiry) = nameWrapper.getData(tokenId);
-        //uint256 expires = baseRegistrarImplementation.nameExpires(tokenId);
-        uint256 renewRange = getParentExpiry() - expiry;
+        uint256 renewRange = getParentExpiry(node) - expiry;
         uint256 maxYears = (renewRange) / (31556926);
-        uint256 price = getLetterFees(label, duration);
+        uint256 price = getLetterFees(node, label, duration);
         
         require(maxYears >= 1 && duration <= maxYears, 'cant extend date past the parent');
         require(price == msg.value, 'price not correct');
+
+        // do balance mapping record
+        parentNodeBalance[node] += msg.value;
+
         uint64 subscriptionPeriod = uint64(duration) * 31556926;
-        
-        nameWrapper.extendExpiry(parentNode, labelhash, subscriptionPeriod + expiry);  
+        nameWrapper.extendExpiry(node, labelhash, subscriptionPeriod + expiry);  
     }
 
 
     /*
     * Withdraw funds
     */
-    function withdraw() 
+    function withdrawNodeBalance(bytes32 node) 
         external 
-        onlyOwner 
+        isNodeActiveOwnerorApproved(node)
         nonReentrant
     {
-        (bool success, ) = owner().call{value: address(this).balance}(""); 
+        require(parentNodeBalance[node] > 0, 'sell some subs and come back..GL');
+        require(msg.sender != address(this), 'contract is approved but cannot withdraw');
+        
+        //only balance taken
+        parentNodeBalance[node] = 0;
+        (bool success, ) = msg.sender.call{value: parentNodeBalance[node]}(""); 
         require(success, "Transfer failed");
     }
+
+    // emergency withdraw for node by contract owner***
 }
