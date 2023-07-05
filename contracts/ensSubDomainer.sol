@@ -192,6 +192,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         external 
         isNodeActiveOwnerorApproved(node)
     {
+        require(!parentNodeActive[node], 'node active, try another');
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
         parentNodeActive[node] = true;
