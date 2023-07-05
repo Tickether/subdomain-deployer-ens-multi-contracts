@@ -288,8 +288,10 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         require(msg.sender != address(this), 'contract is approved but cannot withdraw');
         
         //only balance taken
+        
+        uint256 nodeBalance = parentNodeBalance[node];
         parentNodeBalance[node] = 0;
-        (bool success, ) = msg.sender.call{value: parentNodeBalance[node]}(""); 
+        (bool success, ) = msg.sender.call{value: nodeBalance}(""); 
         require(success, "Transfer failed");
     }
 
