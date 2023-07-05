@@ -111,6 +111,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     // set base fee
     function setLetterFees(bytes32 node, uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
         external 
+        isActiveNode(node)
         isNodeActiveOwnerorApproved(node)
     {
         threeUpLetterFee[node] = threeUpLetterFee_;
@@ -142,6 +143,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     
     //gets price base on string length
     function getLetterFees(bytes32 node, string memory label, uint256 duration)  
+        isActiveNode(node)
         public
         view
         returns (uint256) 
@@ -173,6 +175,11 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier isActiveNode (bytes32 node){
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        _;
+    }
+
     modifier isNodeActiveOwnerorApproved (bytes32 node) {
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         if(nameWrapper.isWrapped(node)) {
@@ -184,10 +191,9 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     }
 
 //function to set init node
-    function setBaseEns(bytes32 node)
-        onlyOwner  
-        isNodeActiveOwnerorApproved(node)
+    function setBaseEns(bytes32 node)  
         external 
+        isNodeActiveOwnerorApproved(node)
     {
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
@@ -212,10 +218,13 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     function setSubDomain(bytes32 node, string memory subNodeLabel, address owner, uint256 duration)  
         external 
         payable 
+        isActiveNode(node)
         isApprovedLabel(subNodeLabel)
         isAvailableLabel(node, subNodeLabel)
         nonReentrant
     {
+        
+
         uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
         uint64 timestamp = uint64(block.timestamp);
         uint256 parentNodeYrsLeft = getParentExpiry(node) - timestamp;
@@ -242,6 +251,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     function extendSubDomain(bytes32 node, bytes32 subNode,  uint256 duration)
         external 
         payable  
+        isActiveNode(node)
         isNodeActiveOwnerorApproved(subNode) 
         nonReentrant
     {
@@ -270,6 +280,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     */
     function withdrawNodeBalance(bytes32 node) 
         external 
+        isActiveNode(node)
         isNodeActiveOwnerorApproved(node)
         nonReentrant
     {
