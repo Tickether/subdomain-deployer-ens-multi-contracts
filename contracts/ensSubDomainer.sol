@@ -110,10 +110,11 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
 
     // set base fee
     function setLetterFees(bytes32 node, uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
-        external 
-        isActiveNode(node)
+        external
         isNodeActiveOwnerorApproved(node)
     {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        
         threeUpLetterFee[node] = threeUpLetterFee_;
         fourFiveLetterFee[node] = fourFiveLetterFee_;
         sixDownLetterFee[node] = sixDownLetterFee_;
@@ -143,11 +144,12 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     
     //gets price base on string length
     function getLetterFees(bytes32 node, string memory label, uint256 duration)  
-        isActiveNode(node)
         public
         view
         returns (uint256) 
     {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        
         uint len = StringUtils.strlen(label);
         require(len > 0);
 
@@ -172,11 +174,6 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     modifier isAvailableLabel (bytes32 node, string memory subNodeLabel_) {
         bytes32 labelhash = keccak256(bytes(subNodeLabel_));
         require(!ens.recordExists(keccak256(abi.encodePacked(node, labelhash))), "not Available Label");
-        _;
-    }
-
-    modifier isActiveNode (bytes32 node){
-        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         _;
     }
 
@@ -218,11 +215,11 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     function setSubDomain(bytes32 node, string memory subNodeLabel, address owner, uint256 duration)  
         external 
         payable 
-        isActiveNode(node)
         isApprovedLabel(subNodeLabel)
         isAvailableLabel(node, subNodeLabel)
         nonReentrant
     {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         
 
         uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
@@ -250,11 +247,12 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
 // solved
     function extendSubDomain(bytes32 node, bytes32 subNode,  uint256 duration)
         external 
-        payable  
-        isActiveNode(node)
+        payable
         isNodeActiveOwnerorApproved(subNode) 
         nonReentrant
     {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        
         string memory label = StringUtils.extractLabel(nameWrapper.names(subNode));
         bytes32 labelhash = keccak256(bytes(label));
         uint256 tokenId = uint256(subNode);
@@ -279,11 +277,12 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     * Withdraw funds
     */
     function withdrawNodeBalance(bytes32 node) 
-        external 
-        isActiveNode(node)
+        external
         isNodeActiveOwnerorApproved(node)
         nonReentrant
     {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        
         require(parentNodeBalance[node] > 0, 'sell some subs and come back..GL');
         require(msg.sender != address(this), 'contract is approved but cannot withdraw');
         
