@@ -31,35 +31,56 @@ library StringUtils {
         return len;
     }
 
-    function validateString(string memory label) internal pure returns (bool) {
+    function validateString(string memory label) internal pure returns (uint) {
         bytes memory inputBytes = bytes(label);
-        
+
         // Check if the string is empty
         if (inputBytes.length == 0) {
-            return false;
+            return 0;
         }
-        
+
+        // Check if the string contains only numbers
+        bool containsOnlyNumbers = true;
+        for (uint256 i = 0; i < inputBytes.length; i++) {
+            bytes1 char = inputBytes[i];
+
+            // Check for spaces within the input string
+            if (char == 0x20) {
+                return 0;  // Space character is not allowed
+            }
+
+            // Check if the character is not a number
+            if (!(char >= 0x30 && char <= 0x39)) {
+                containsOnlyNumbers = false;
+                break;
+            }
+        }
+
+        if (containsOnlyNumbers) {
+            return 2;  // String contains only numbers
+        }
+
         // Check the first character of the string
         if (!((inputBytes[0] >= 0x30 && inputBytes[0] <= 0x39) || (inputBytes[0] >= 0x61 && inputBytes[0] <= 0x7A))) {
-            return false;
+            return 0;
         }
-        
+
         // Check the remaining characters of the string
         for (uint256 i = 1; i < inputBytes.length; i++) {
             bytes1 char = inputBytes[i];
 
             // Check for spaces within the input string
             if (char == 0x20) {
-            return false;  // Space character is not allowed
+                return 0;  // Space character is not allowed
             }
-            
+
             // Check if the character is a lowercase letter or a number
             if (!((char >= 0x30 && char <= 0x39) || (char >= 0x61 && char <= 0x7A))) {
-                return false;
+                return 0;
             }
         }
-        
-        return true;
+
+        return 1;
     }
 
     function extractLabel(bytes memory encodedLabel) 
