@@ -101,6 +101,8 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
     mapping(bytes32 => uint256) public parentNodeBalance;
     //track intt nodes
     mapping(bytes32 => bool) public parentNodeActive;
+    //track canSub nodes
+    mapping(bytes32 => bool) public parentNodeCanSubActive;
     //track prices mapping per node
     mapping(bytes32 => uint256) public threeUpLetterFee;
     mapping(bytes32 => uint256) public fourFiveLetterFee;
@@ -198,6 +200,14 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         parentNodeActive[node] = true;
     }
 
+    function flipBaseEnsSubMode(bytes32 node) 
+        external 
+        isNodeActiveOwnerorApproved(node)
+    {
+        require(parentNodeActive[node], 'node not active, cannot toggle');
+        parentNodeCanSubActive[node] = !parentNodeCanSubActive[node];
+    }
+
 
 
     
@@ -221,6 +231,7 @@ contract EnsSubDomain is Ownable, ReentrancyGuard {
         nonReentrant
     {
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        require(parentNodeCanSubActive[node], 'node owner has paused subdomain creation');
         
 
         uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
