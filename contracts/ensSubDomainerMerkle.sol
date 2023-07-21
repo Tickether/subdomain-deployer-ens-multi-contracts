@@ -8,6 +8,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./StringUtils.sol";
+import "./ensSubMerkle.sol";
 
 //interfaces
 /*
@@ -81,7 +82,7 @@ interface INameWrapper {
 
 
 
-contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
+contract EnsSubDomainerMerkle is Ownable, ensSubMerkle, ReentrancyGuard {
     AggregatorV3Interface internal priceFeed = AggregatorV3Interface( 0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e ); // change beefore mainnet
     
 
@@ -236,7 +237,7 @@ contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
     }
 
 //function to set init node
-    function setBaseEns(bytes32 node)  
+    function setBaseEns(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
         external 
         isNodeActiveOwnerorApproved(node)
     {
@@ -244,6 +245,22 @@ contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
         parentNodeActive[node] = true;
+        // add merkle
+        _setSubListMerkle(merkleRoot, node);
+        // set max
+        _setMaxSubListENS(numberOfSubENS, node);
+        
+    }
+
+    function updateBaseEnsMerkle(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
+        external 
+        isNodeActiveOwnerorApproved(node)
+    {
+        require(parentNodeActive[node], 'node must be active');
+        // add merkle
+        _setSubListMerkle(merkleRoot, node);
+        // set max
+        _setMaxSubListENS(numberOfSubENS, node);
     }
 
     function flipBaseEnsSubMode(bytes32 node) 
@@ -267,40 +284,65 @@ contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
         return baseRegistrarImplementation.nameExpires(tokenId);
     }
 
-// function to set new sub domain
-
-    function setSubDomain(bytes32 node, string memory subNodeLabel, address owner, uint256 duration)  
-        external 
-        payable 
-        isApprovedLabel(subNodeLabel)
-        isAvailableLabel(node, subNodeLabel)
-        nonReentrant
+    function updateNodeBalance(bytes32 node, uint256 amount) 
+        internal 
     {
-        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
-        require(parentNodeCanSubActive[node], 'node owner has paused subdomain creation');
-
-        uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
-        uint64 timestamp = uint64(block.timestamp);
-        uint256 parentNodeYrsLeft = getParentExpiry(node) - timestamp;
-        uint64 maxYears = uint64(parentNodeYrsLeft) / uint64(31556926);
-
+        parentNodeBalance[node] += amount;
+    }
+    
+    function getPricetoUse (bytes32 node, string memory subNodeLabel, uint256 duration) 
+        internal 
+        view    
+        returns(uint) 
+    {
         uint256 price;
         if (StringUtils.validateString(subNodeLabel) == 1) {
             price = getLetterFees(node, subNodeLabel, duration);
         } else if(StringUtils.validateString(subNodeLabel) == 2) {
             price = getNumberFees(node, subNodeLabel, duration);
         }
+        return price;
+    }
+
+// function to set new sub domain
+
+    function setSubDomain(bytes32 node, string memory subNodeLabel, address owner, uint256 duration, bytes32[] memory merkleRoot)  
+        external 
+        payable 
+        isApprovedLabel(subNodeLabel)
+        isAvailableLabel(node, subNodeLabel)
+        //availableSubENS(msg.sender, 1, node)
+        nonReentrant
+    {
+        require(onSubList(msg.sender, merkleRoot, node), 'Not on sub ens list');
+
+        if(parentNodeMaxSub[node] >= 1){
+            require(getSubListENS(msg.sender, node) + 1 <= parentNodeMaxSub[node] , 'Purchase would exceed number of ens allotted');
+        }else if(parentNodeMaxSub[node] < 1){
+            require(getSubListENS(msg.sender, node) + 1 < parentNodeMaxSub[node], 'Purchase must be over zero');
+        }
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        require(parentNodeCanSubActive[node], 'node owner has paused subdomain creation');
+
+        //uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
+        //uint64 timestamp = uint64(block.timestamp);
+        uint256 parentNodeYrsLeft = getParentExpiry(node) - uint64(block.timestamp);
+        uint64 maxYears = uint64(parentNodeYrsLeft) / uint64(31556926);
+
+        
 
         require(duration <= maxYears,'cant extend date past the parent');
         require(nameWrapper.isWrapped(node), 'parent must be wrapped');
         require(nameWrapper.allFusesBurned(node, 1), 'parent must be locked');
-        require(price == msg.value, 'price not correct');
+        require(getPricetoUse(node, subNodeLabel, duration) == msg.value, 'price not correct');
 
         // do balance mapping record
-        parentNodeBalance[node] += msg.value;
+        updateNodeBalance(node, getPricetoUse(node, subNodeLabel, duration));
+
+        _setSubListENS(msg.sender, 1, node);
         
         uint64 subscriptionPeriod = uint64(duration) * 31556926;
-        nameWrapper.setSubnodeRecord(node, subNodeLabel, owner, ensResolver, 0, fuses, subscriptionPeriod + timestamp);
+        nameWrapper.setSubnodeRecord(node, subNodeLabel, owner, ensResolver, 0, 65537, subscriptionPeriod + uint64(block.timestamp));
 
     }
 
@@ -308,12 +350,13 @@ contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
 // the real issue here is we cannot emancipate or risk losing out on yearly subdomain subs model
 // we have to lock instead
 // solved
-    function extendSubDomain(bytes32 node, bytes32 subNode,  uint256 duration)
+    function extendSubDomain(bytes32 node, bytes32 subNode,  uint256 duration, bytes32[] memory merkleRoot)
         external 
         payable
-        isNodeActiveOwnerorApproved(subNode) 
+        isNodeActiveOwnerorApproved(subNode)
         nonReentrant
     {
+        require(onSubList(msg.sender, merkleRoot, node), 'Not on sub ens list');
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         
         string memory label = StringUtils.extractLabel(nameWrapper.names(subNode));
@@ -324,18 +367,13 @@ contract EnsSubDomainerMerkle is Ownable, ReentrancyGuard {
         uint256 renewRange = getParentExpiry(node) - expiry;
         uint256 maxYears = (renewRange) / (31556926);
         
-        uint256 price;
-        if (StringUtils.validateString(label) == 1) {
-            price = getLetterFees(node, label, duration);
-        } else if(StringUtils.validateString(label) == 2) {
-            price = getNumberFees(node, label, duration);
-        }
+        
         
         require(maxYears >= 1 && duration <= maxYears, 'cant extend date past the parent');
-        require(price == msg.value, 'price not correct');
+        require(getPricetoUse(node, label, duration) == msg.value, 'price not correct');
 
         // do balance mapping record
-        parentNodeBalance[node] += msg.value;
+        updateNodeBalance(node, getPricetoUse(node, label, duration));
 
         uint64 subscriptionPeriod = uint64(duration) * 31556926;
         nameWrapper.extendExpiry(node, labelhash, subscriptionPeriod + expiry);  

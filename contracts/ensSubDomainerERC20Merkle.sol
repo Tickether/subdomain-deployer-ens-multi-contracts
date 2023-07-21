@@ -7,6 +7,8 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./StringUtils.sol";
+import "./ensSubMerkle.sol";
+
 
 //interfaces
 /*
@@ -85,7 +87,7 @@ interface IERC20{
 
 
 
-contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
+contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     
      //Treasury
     address payable public treasury = payable(0xF7B083022560C6b7FD0a758A5A1edD47eA87C2bC);
@@ -222,7 +224,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
     }
 
 //function to set init node
-    function setBaseEns(bytes32 node)  
+    function setBaseEns(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
         external 
         isNodeActiveOwnerorApproved(node)
     {
@@ -230,6 +232,21 @@ contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
         parentNodeActive[node] = true;
+        // add merkle
+        _setSubListMerkle(merkleRoot, node);
+        // set max
+        _setMaxSubListENS(numberOfSubENS, node);
+    }
+
+    function updateBaseEnsMerkle(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
+        external 
+        isNodeActiveOwnerorApproved(node)
+    {
+        require(parentNodeActive[node], 'node must be active');
+        // add merkle
+        _setSubListMerkle(merkleRoot, node);
+        // set max
+        _setMaxSubListENS(numberOfSubENS, node);
     }
 
 
@@ -288,19 +305,27 @@ contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
 
 // function to set new sub domain ERC20
 
-    function setSubDomainERC20(bytes32 node, string memory subNodeLabel, address owner, uint256 duration, address erc20Contract)  
+    function setSubDomainERC20(bytes32 node, string memory subNodeLabel, address owner, uint256 duration, address erc20Contract, bytes32[] memory merkleRoot)  
         external
         isApprovedLabel(subNodeLabel)
         isAvailableLabel(node, subNodeLabel)
         nonReentrant
     {
+        require(onSubList(msg.sender, merkleRoot, node), 'Not on sub ens list');
+
+        if(parentNodeMaxSub[node] >= 1){
+            require(getSubListENS(msg.sender, node) + 1 <= parentNodeMaxSub[node] , 'Purchase would exceed number of ens allotted');
+        }else if(parentNodeMaxSub[node] < 1){
+            require(getSubListENS(msg.sender, node) + 1 < parentNodeMaxSub[node], 'Purchase must be over zero');
+        }
+
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         require(parentNodeCanSubERC20Active[node][erc20Contract], 'node owner has paused subdomain creation with this erc20 token');
 
         
-        uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
-        uint64 timestamp = uint64(block.timestamp);
-        uint256 parentNodeYrsLeft = getParentExpiry(node) - timestamp;
+        //uint32 fuses = 65537; //fuse set to patent cannot control or cannot unwrap
+        //uint64 timestamp = uint64(block.timestamp);
+        uint256 parentNodeYrsLeft = getParentExpiry(node) - uint64(block.timestamp);
         uint64 maxYears = uint64(parentNodeYrsLeft) / uint64(31556926);
 
         require(duration <= maxYears,'cant extend date past the parent');
@@ -311,9 +336,9 @@ contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
         tranferERC20( getPricetoUse(node, subNodeLabel, duration, erc20Contract), erc20Contract );
         updateNodeBalanceERC20(node, getPricetoUse(node, subNodeLabel, duration, erc20Contract), erc20Contract);
         
-        
+        _setSubListENS(msg.sender, 1, node);
         uint64 subscriptionPeriod = uint64(duration) * 31556926;
-        nameWrapper.setSubnodeRecord(node, subNodeLabel, owner, ensResolver, 0, fuses, subscriptionPeriod + timestamp);
+        nameWrapper.setSubnodeRecord(node, subNodeLabel, owner, ensResolver, 0, 65537, subscriptionPeriod + uint64(block.timestamp));
 
     }
 
@@ -325,12 +350,13 @@ contract EnsSubDomainerERC20Merkle is Ownable, ReentrancyGuard {
 // we have to lock instead
 // solved
 
-    function extendSubDomainERC20(bytes32 node, bytes32 subNode, uint256 duration, address erc20Contract)
+    function extendSubDomainERC20(bytes32 node, bytes32 subNode, uint256 duration, address erc20Contract, bytes32[] memory merkleRoot)
         external 
         payable
-        isNodeActiveOwnerorApproved(subNode) 
+        isNodeActiveOwnerorApproved(subNode)
         nonReentrant
     {
+        require(onSubList(msg.sender, merkleRoot, node), 'Not on sub ens list');
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         require(parentNodeCanSubERC20Active[node][erc20Contract], 'node owner has paused subdomain extending with this erc20 token');
         
