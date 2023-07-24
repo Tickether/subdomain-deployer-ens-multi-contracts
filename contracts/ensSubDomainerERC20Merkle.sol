@@ -105,6 +105,8 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     
     //track intt nodes
     mapping(bytes32 => bool) public parentNodeActive;
+    //track canSub nodes
+    mapping(bytes32 => bool) public parentNodeCanSubActive;
     //track canSub nodes ERC20
     mapping(bytes32 => mapping(address => bool)) public parentNodeCanSubERC20Active;
 
@@ -320,6 +322,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
         }
 
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        require(parentNodeCanSubActive[node], 'node owner has paused subdomain creation');
         require(parentNodeCanSubERC20Active[node][erc20Contract], 'node owner has paused subdomain creation with this erc20 token');
 
         
