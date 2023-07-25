@@ -109,6 +109,8 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     mapping(bytes32 => bool) public parentNodeCanSubActive;
     //track canSub nodes ERC20
     mapping(bytes32 => mapping(address => bool)) public parentNodeCanSubERC20Active;
+    //track nodes ERC20 list
+    mapping(bytes32 => address[]) public parentNodeERC20Contracts;
 
 
 
@@ -259,6 +261,21 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     {
         require(parentNodeActive[node], 'node not active, cannot toggle');
         parentNodeCanSubERC20Active[node][erc20Contract] = !parentNodeCanSubERC20Active[node][erc20Contract];
+        if(!parentNodeCanSubERC20Active[node][erc20Contract]){
+            parentNodeERC20Contracts[node].push(erc20Contract);
+        }else{
+            parentNodeERC20Contracts[node];
+            for (uint256 i = 0; i < parentNodeERC20Contracts[node].length; i++) {
+                if (parentNodeERC20Contracts[node][i] == erc20Contract) {
+                    // Move the last element to the position of the element to be removed
+                    parentNodeERC20Contracts[node][i] = parentNodeERC20Contracts[node][parentNodeERC20Contracts[node].length - 1];
+                    // Remove the last element (duplicate) from the array
+                    parentNodeERC20Contracts[node].pop();
+                    // Exit the loop as the address is found and removed
+                    break;
+                }
+            }
+        }
     }
 
 
