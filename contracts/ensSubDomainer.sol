@@ -81,7 +81,7 @@ interface INameWrapper {
 
 
 
-contract EnsSubDomain is Ownable, ReentrancyGuard {
+contract EnsSubDomainer is Ownable, ReentrancyGuard {
     AggregatorV3Interface internal priceFeed = AggregatorV3Interface( 0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e ); // change beefore mainnet
     
 
