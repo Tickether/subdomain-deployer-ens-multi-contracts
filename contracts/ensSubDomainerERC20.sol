@@ -106,7 +106,7 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
     //track canSub nodes ERC20
     mapping(bytes32 => mapping(address => bool)) public parentNodeCanSubERC20Active;
     //track nodes ERC20 list
-    mapping(bytes32 => address[]) public parentNodeERC20Contracts;
+    mapping(bytes32 => address[]) private parentNodeERC20Contracts;
 
 
 
@@ -120,16 +120,31 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
     mapping(bytes32 => mapping(address => uint256)) public threeNumberFeeERC20;
     mapping(bytes32 => mapping(address => uint256)) public fourNumberFeeERC20;
     mapping(bytes32 => mapping(address => uint256)) public fiveUpNumberFeeERC20;
-    
 
 
+
+    //add erc20contract
+    function addERC20(bytes32 node, address erc20Contract) external {
+        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        //req not on list... check for that
+        for (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
+            require(parentNodeERC20Contracts[node][i] != erc20Contract, 'already added');
+        }
+        parentNodeERC20Contracts[node].push(erc20Contract);
+    }
+    //remove?
+    function listERC20(bytes32 node) external view returns (address[] memory) {
+        return parentNodeERC20Contracts[node];
+    }
     
 // set base fee letters
     function setLetterFeesERC20(bytes32 node, address erc20Contract, uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
         external
         isNodeActiveOwnerorApproved(node)
     {
-        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        for (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
+            require(parentNodeERC20Contracts[node][i] == erc20Contract, 'not added');
+        }
         
         threeUpLetterFeeERC20[node][erc20Contract] = threeUpLetterFee_;
         fourFiveLetterFeeERC20[node][erc20Contract] = fourFiveLetterFee_;
@@ -142,7 +157,9 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
         external
         isNodeActiveOwnerorApproved(node)
     {
-        require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
+        for (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
+            require(parentNodeERC20Contracts[node][i] == erc20Contract, 'not added');
+        }
         
         oneNumberFeeERC20[node][erc20Contract] = oneNumberFeeERC20_;
         twoNumberFeeERC20[node][erc20Contract] = twoNumberFeeERC20_;
