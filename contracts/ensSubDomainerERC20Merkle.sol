@@ -126,7 +126,10 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
 
 
     //add erc20contract
-    function addERC20(bytes32 node, address erc20Contract) external {
+    function addERC20(bytes32 node, address erc20Contract)
+        external
+        isNodeActiveOwnerorApproved(node) 
+    {
         require(parentNodeActive[node], 'node not active, approve contract & setBaseENS to activate');
         //req not on list... check for that
         for (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
@@ -144,7 +147,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
         external
         isNodeActiveOwnerorApproved(node)
     {
-        for (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
+        for     (uint i = 0; i < parentNodeERC20Contracts[node].length; i++) {
             require(parentNodeERC20Contracts[node][i] == erc20Contract, 'not added');
         }
         
