@@ -137,7 +137,7 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
         return parentNodeERC20Contracts[node];
     }
     
-// set base fee letters
+    // set base fee letters
     function setLetterFeesERC20(bytes32 node, address erc20Contract, uint256 threeUpLetterFee_, uint256 fourFiveLetterFee_, uint256 sixDownLetterFee_)  
         external
         isNodeActiveOwnerorApproved(node)

@@ -243,7 +243,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     }
 
 //function to set init node
-    function setBaseEns(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
+    function setBaseEns(bytes32 node)  
         external 
         isNodeActiveOwnerorApproved(node)
     {
@@ -251,10 +251,6 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
         (address owner, /*uint32 fuses*/, /*uint64 expiry*/) = nameWrapper.getData(uint256(node));
         require(nameWrapper.isApprovedForAll(owner, address(this)), "please approve this contract address");
         parentNodeActive[node] = true;
-        // add merkle
-        _setSubListMerkle(merkleRoot, node);
-        // set max
-        _setMaxSubListENS(numberOfSubENS, node);
     }
 
     function updateBaseEnsMerkle(bytes32 node, bytes32 merkleRoot, uint256 numberOfSubENS)  
