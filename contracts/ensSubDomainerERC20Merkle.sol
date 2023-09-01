@@ -177,7 +177,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
 
     //gets price base on string length
     function getLetterFeesERC20(bytes32 node, address erc20Contract, string memory label, uint256 duration)  
-        public
+        internal
         view
         returns (uint256) 
     {
@@ -198,7 +198,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     }
 
     function getNumberFeesERC20(bytes32 node, address erc20Contract, string memory label, uint256 duration)  
-        public
+        internal
         view
         returns (uint256) 
     {
@@ -313,7 +313,7 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
     }
     
     function getPricetoUse (bytes32 node, string memory subNodeLabel, uint256 duration, address erc20Contract) 
-        internal 
+        public 
         view    
         returns(uint) 
     {

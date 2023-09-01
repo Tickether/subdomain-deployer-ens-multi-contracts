@@ -168,7 +168,7 @@ contract EnsSubDomainerMerkle is Ownable, ensSubMerkle, ReentrancyGuard {
     
     //gets price base on string length
     function getLetterFees(bytes32 node, string memory label, uint256 duration)  
-        public
+        internal
         view
         returns (uint256) 
     {
@@ -189,7 +189,7 @@ contract EnsSubDomainerMerkle is Ownable, ensSubMerkle, ReentrancyGuard {
     }
 
     function getNumberFees(bytes32 node, string memory label, uint256 duration)  
-        public
+        internal
         view
         returns (uint256) 
     {
@@ -286,7 +286,7 @@ contract EnsSubDomainerMerkle is Ownable, ensSubMerkle, ReentrancyGuard {
     }
     
     function getPricetoUse (bytes32 node, string memory subNodeLabel, uint256 duration) 
-        internal 
+        public 
         view    
         returns(uint) 
     {
