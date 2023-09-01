@@ -188,6 +188,7 @@ contract EnsSubDomainer is Ownable, ReentrancyGuard {
     }
 
     function getNumberFees(bytes32 node, string memory label, uint256 duration)  
+        internal
         view
         returns (uint256) 
     {
