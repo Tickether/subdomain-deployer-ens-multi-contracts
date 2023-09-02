@@ -81,6 +81,7 @@ interface INameWrapper {
 interface IERC20{
     function balanceOf(address account) external view returns (uint256);
     function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function decimals() external view returns (uint8);
 }
 
 
@@ -326,8 +327,8 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
         internal 
     {
         IERC20 tokenContract = IERC20(erc20Contract);
-        require(tokenContract.balanceOf(msg.sender) >= price, 'not enough tokens');
-        bool transferred = tokenContract.transferFrom(msg.sender, address(this), price);
+        require(tokenContract.balanceOf(msg.sender) >= (price * tokenContract.decimals()), 'not enough tokens');
+        bool transferred = tokenContract.transferFrom(msg.sender, address(this), (price * tokenContract.decimals()));
         require(transferred, "failed transfer"); 
     }
 
