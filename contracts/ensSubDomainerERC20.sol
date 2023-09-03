@@ -97,9 +97,8 @@ contract EnsSubDomainerERC20 is Ownable, ReentrancyGuard {
     address public ensResolver = 0xd7a4F6473f32aC2Af804B3686AE8F1932bC35750;
 
     //track eth balances mapping per node
-    mapping(bytes32 => uint256) public parentNodeBalance;
+    //mapping(bytes32 => uint256) public parentNodeBalance;
     //track eth balances mapping per node ERC20
-    
     mapping(bytes32 => mapping(address => uint256)) public parentNodeBalanceERC20;
     
     //track intt nodes
