@@ -339,8 +339,8 @@ contract EnsSubDomainerERC20Merkle is Ownable, ensSubMerkle, ReentrancyGuard {
         internal 
     {
         IERC20 tokenContract = IERC20(erc20Contract);
-        require(tokenContract.balanceOf(msg.sender) >= (price * tokenContract.decimals()), 'not enough tokens');
-        bool transferred = tokenContract.transferFrom(msg.sender, address(this), (price * tokenContract.decimals()));
+        require(tokenContract.balanceOf(msg.sender) >= (price * (1 * (10 ** uint256(tokenContract.decimals())))), 'not enough tokens');
+        bool transferred = tokenContract.transferFrom(msg.sender, address(this), (price * (1 * (10 ** uint256(tokenContract.decimals())))));
         require(transferred, "failed transfer"); 
     }
 
